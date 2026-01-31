@@ -7,15 +7,30 @@ This guide will help you set up Google Sheets integration for your Scouting App.
 1. Go to [Google Sheets](https://sheets.google.com)
 2. Create a new spreadsheet
 3. Name it something like "Scouting Data" or whatever you prefer
-4. In the first row, add these column headers:
-   - **Type** (Column A) - Will be "auto" or "teleop"
-   - **Quole** (Column B)
-   - **Team Number** (Column C)
-   - **Auto Counter** (Column D) - Only for auto data
-   - **Auto Climbed** (Column E) - Only for auto data (True/False)
-   - **Teleop Counter** (Column F) - Only for teleop data
-   - **Climb Level** (Column G) - Only for teleop data (No Climb, L1, L2, L3)
-   - **Timestamp** (Column H)
+4. **That's it!** The script will automatically create the necessary sheets and structure.
+
+### 📊 Three-Layer Structure
+
+Your spreadsheet will automatically have **3 logical layers**:
+
+#### 1️⃣ **RawData Sheet** (Created Automatically)
+- **Purpose**: Receives every POST request from your app
+- **Never edit manually** - This is your single source of truth
+- **Append-only** - Data is never deleted or modified
+- **Columns**: Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp
+
+#### 2️⃣ **Team_XXX Sheets** (Created Automatically)
+- **One sheet per team** (e.g., `Team_254`, `Team_1678`)
+- Created automatically when a team appears in RawData
+- Each sheet has two sections:
+  - **AUTO Section**: Shows all auto data for that team
+  - **TELEOP Section**: Shows all teleop data for that team
+- Data is automatically organized and sorted by timestamp
+
+#### 3️⃣ **Dashboard Sheet** (Optional - You can create this later)
+- For analysis and summaries
+- Can compare teams, calculate averages, etc.
+- Not created automatically - you can add this if needed
 
 ## Step 2: Create a Google Apps Script
 
@@ -25,19 +40,25 @@ This guide will help you set up Google Sheets integration for your Scouting App.
 4. Copy and paste the following code:
 
 ```javascript
+// ============================================
+// MAIN ENTRY POINT - Receives POST requests
+// ============================================
 function doPost(e) {
   try {
     // Parse the incoming JSON data
     const data = JSON.parse(e.postData.contents);
     
-    // Get the active spreadsheet
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    // Validate required fields
+    if (!data.teamNum) {
+      throw new Error('Team Number is required');
+    }
     
-    // Determine data type and format the row accordingly
+    // Get or create RawData sheet
+    const rawDataSheet = getOrCreateRawDataSheet();
+    
+    // Format row data for RawData
     let rowData = [];
-    
     if (data.type === 'auto') {
-      // Auto data format: Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp
       rowData = [
         'auto',
         data.quole || '',
@@ -49,7 +70,6 @@ function doPost(e) {
         data.timestamp || ''
       ];
     } else if (data.type === 'teleop') {
-      // Teleop data format: Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp
       rowData = [
         'teleop',
         data.quole || '',
@@ -74,8 +94,11 @@ function doPost(e) {
       ];
     }
     
-    // Append the data as a new row
-    sheet.appendRow(rowData);
+    // Append to RawData (append-only, never edited manually)
+    rawDataSheet.appendRow(rowData);
+    
+    // Organize data into team sheet
+    updateTeamSheet(data.teamNum);
     
     // Return success response
     return ContentService.createTextOutput(JSON.stringify({
@@ -89,6 +112,221 @@ function doPost(e) {
       success: false,
       message: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============================================
+// RAW DATA SHEET MANAGEMENT
+// ============================================
+function getOrCreateRawDataSheet() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let rawDataSheet = spreadsheet.getSheetByName('RawData');
+  
+  if (!rawDataSheet) {
+    // Create RawData sheet
+    rawDataSheet = spreadsheet.insertSheet('RawData');
+    
+    // Set up headers
+    const headers = [
+      'Type',
+      'Quole',
+      'Team Number',
+      'Auto Counter',
+      'Auto Climbed',
+      'Teleop Counter',
+      'Climb Level',
+      'Timestamp'
+    ];
+    rawDataSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    // Format header row
+    const headerRange = rawDataSheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4285f4');
+    headerRange.setFontColor('#ffffff');
+    
+    // Freeze header row
+    rawDataSheet.setFrozenRows(1);
+  }
+  
+  return rawDataSheet;
+}
+
+// ============================================
+// TEAM SHEET MANAGEMENT
+// ============================================
+function getOrCreateTeamSheet(teamNumber) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = 'Team_' + teamNumber;
+  let teamSheet = spreadsheet.getSheetByName(sheetName);
+  
+  if (!teamSheet) {
+    // Create team sheet
+    teamSheet = spreadsheet.insertSheet(sheetName);
+    
+    // Set up AUTO section
+    teamSheet.getRange(1, 1).setValue('TEAM ' + teamNumber + ' — AUTO');
+    teamSheet.getRange(1, 1).setFontWeight('bold');
+    teamSheet.getRange(1, 1).setFontSize(14);
+    teamSheet.getRange(1, 1, 1, 4).merge();
+    
+    const autoHeaders = ['Timestamp', 'Quole', 'Auto Counter', 'Auto Climbed'];
+    teamSheet.getRange(2, 1, 1, autoHeaders.length).setValues([autoHeaders]);
+    teamSheet.getRange(2, 1, 1, autoHeaders.length).setFontWeight('bold');
+    teamSheet.getRange(2, 1, 1, autoHeaders.length).setBackground('#e3f2fd');
+    
+    // Set up TELEOP section (start at row 4 to leave space)
+    const teleopStartRow = 4;
+    teamSheet.getRange(teleopStartRow, 1).setValue('TEAM ' + teamNumber + ' — TELEOP');
+    teamSheet.getRange(teleopStartRow, 1).setFontWeight('bold');
+    teamSheet.getRange(teleopStartRow, 1).setFontSize(14);
+    teamSheet.getRange(teleopStartRow, 1, 1, 4).merge();
+    
+    const teleopHeaders = ['Timestamp', 'Quole', 'Teleop Counter', 'Climb Level'];
+    teamSheet.getRange(teleopStartRow + 1, 1, 1, teleopHeaders.length).setValues([teleopHeaders]);
+    teamSheet.getRange(teleopStartRow + 1, 1, 1, teleopHeaders.length).setFontWeight('bold');
+    teamSheet.getRange(teleopStartRow + 1, 1, 1, teleopHeaders.length).setBackground('#fff3e0');
+    
+    // Freeze header rows
+    teamSheet.setFrozenRows(1);
+  }
+  
+  return teamSheet;
+}
+
+// ============================================
+// UPDATE TEAM SHEET WITH DATA FROM RAWDATA
+// ============================================
+function updateTeamSheet(teamNumber) {
+  try {
+    const rawDataSheet = getOrCreateRawDataSheet();
+    const teamSheet = getOrCreateTeamSheet(teamNumber);
+    
+    // Get all data from RawData
+    const rawData = rawDataSheet.getDataRange().getValues();
+    const headers = rawData[0];
+    
+    // Find column indices
+    const typeCol = headers.indexOf('Type');
+    const teamCol = headers.indexOf('Team Number');
+    const quoleCol = headers.indexOf('Quole');
+    const autoCounterCol = headers.indexOf('Auto Counter');
+    const autoClimbedCol = headers.indexOf('Auto Climbed');
+    const teleopCounterCol = headers.indexOf('Teleop Counter');
+    const climbLevelCol = headers.indexOf('Climb Level');
+    const timestampCol = headers.indexOf('Timestamp');
+    
+    // Filter data for this team
+    const autoRows = [];
+    const teleopRows = [];
+    
+    for (let i = 1; i < rawData.length; i++) {
+      const row = rawData[i];
+      if (row[teamCol] == teamNumber) {
+        if (row[typeCol] === 'auto') {
+          autoRows.push([
+            row[timestampCol] || '',
+            row[quoleCol] || '',
+            row[autoCounterCol] || '',
+            row[autoClimbedCol] || ''
+          ]);
+        } else if (row[typeCol] === 'teleop') {
+          teleopRows.push([
+            row[timestampCol] || '',
+            row[quoleCol] || '',
+            row[teleopCounterCol] || '',
+            row[climbLevelCol] || ''
+          ]);
+        }
+      }
+    }
+    
+    // Sort by timestamp (oldest first)
+    autoRows.sort((a, b) => {
+      if (!a[0] || !b[0]) return 0;
+      return new Date(a[0]) - new Date(b[0]);
+    });
+    
+    teleopRows.sort((a, b) => {
+      if (!a[0] || !b[0]) return 0;
+      return new Date(a[0]) - new Date(b[0]);
+    });
+    
+    // Clear existing data (but keep headers)
+    // AUTO section starts at row 3 (row 1 is title, row 2 is headers)
+    const autoDataStartRow = 3;
+    const autoDataEndRow = teamSheet.getLastRow();
+    if (autoDataEndRow >= autoDataStartRow) {
+      teamSheet.deleteRows(autoDataStartRow, autoDataEndRow - autoDataStartRow + 1);
+    }
+    
+    // Insert AUTO data
+    if (autoRows.length > 0) {
+      teamSheet.getRange(autoDataStartRow, 1, autoRows.length, 4).setValues(autoRows);
+    }
+    
+    // TELEOP section starts at row 4 (after AUTO section)
+    // Calculate where TELEOP section should start (after AUTO section + spacing)
+    const teleopDataStartRow = autoDataStartRow + autoRows.length + 2;
+    
+    // Insert TELEOP section header if not exists
+    if (teamSheet.getRange(teleopDataStartRow - 1, 1).getValue() === '') {
+      teamSheet.getRange(teleopDataStartRow - 1, 1).setValue('TEAM ' + teamNumber + ' — TELEOP');
+      teamSheet.getRange(teleopDataStartRow - 1, 1).setFontWeight('bold');
+      teamSheet.getRange(teleopDataStartRow - 1, 1).setFontSize(14);
+      teamSheet.getRange(teleopDataStartRow - 1, 1, 1, 4).merge();
+      
+      const teleopHeaders = ['Timestamp', 'Quole', 'Teleop Counter', 'Climb Level'];
+      teamSheet.getRange(teleopDataStartRow, 1, 1, teleopHeaders.length).setValues([teleopHeaders]);
+      teamSheet.getRange(teleopDataStartRow, 1, 1, teleopHeaders.length).setFontWeight('bold');
+      teamSheet.getRange(teleopDataStartRow, 1, 1, teleopHeaders.length).setBackground('#fff3e0');
+    }
+    
+    // Insert TELEOP data
+    if (teleopRows.length > 0) {
+      teamSheet.getRange(teleopDataStartRow + 1, 1, teleopRows.length, 4).setValues(teleopRows);
+    }
+    
+  } catch (error) {
+    console.error('Error updating team sheet for team ' + teamNumber + ': ' + error.toString());
+    // Don't throw - we still want to return success for the POST
+  }
+}
+
+// ============================================
+// ORGANIZE ALL EXISTING DATA (One-time setup)
+// ============================================
+function organizeAllData() {
+  try {
+    const rawDataSheet = getOrCreateRawDataSheet();
+    const rawData = rawDataSheet.getDataRange().getValues();
+    
+    if (rawData.length <= 1) {
+      return 'No data to organize';
+    }
+    
+    // Get all unique team numbers
+    const teamCol = rawData[0].indexOf('Team Number');
+    const teams = new Set();
+    
+    for (let i = 1; i < rawData.length; i++) {
+      const teamNum = rawData[i][teamCol];
+      if (teamNum) {
+        teams.add(teamNum);
+      }
+    }
+    
+    // Organize each team
+    let organized = 0;
+    for (const teamNum of teams) {
+      updateTeamSheet(teamNum);
+      organized++;
+    }
+    
+    return 'Organized data for ' + organized + ' team(s)';
+    
+  } catch (error) {
+    return 'Error: ' + error.toString();
   }
 }
 ```
@@ -112,6 +350,28 @@ function doPost(e) {
    - Click **Allow**
 6. After authorization, you'll see a **Web app URL**
 7. **Copy this URL** - you'll need it in the next step
+
+## Step 3.5: Initial Setup (Optional - For Existing Data)
+
+If you already have data in your spreadsheet or want to organize existing RawData, you can run the `organizeAllData()` function:
+
+1. In the Apps Script editor, click on the function dropdown (top left)
+2. Select `organizeAllData`
+3. Click the **Run** button (▶️)
+4. Authorize if prompted
+5. Check the execution log - it will show how many teams were organized
+
+**Note**: This function reads all data from RawData and creates/updates team sheets. It's safe to run multiple times - it will reorganize everything from RawData.
+
+### How Automatic Organization Works
+
+- **RawData sheet** is created automatically on first POST request
+- **Team sheets** (Team_XXX) are created automatically when a new team number appears
+- Data is automatically copied from RawData to the appropriate team sheet
+- Auto data goes to the AUTO section, Teleop data goes to the TELEOP section
+- Data is sorted by timestamp (oldest first)
+
+**You don't need to do anything manually** - the script handles all organization automatically!
 
 ## Step 4: Configure Your Scouting App
 
@@ -153,15 +413,39 @@ If you need to change the URL (for example, if you created a new Google Sheet or
 4. Click "End Auto" - this will save auto data and move to Teleop
 5. In the Teleop page, click the counter button
 6. Click "End Match" - select a climb level (No Climb, L1, L2, or L3)
-7. Check your Google Sheet - you should see two rows: one for auto data and one for teleop data!
+7. Check your Google Sheet:
+   - **RawData sheet**: You should see two rows (one auto, one teleop)
+   - **Team_XXX sheet**: A new sheet should be created with your team number
+   - The team sheet should have AUTO and TELEOP sections with your data organized
 
 ## Troubleshooting
 
-### Data isn't appearing in the sheet
+### Data isn't appearing in RawData sheet
 - Make sure you deployed the Web App with "Who has access" set to **Anyone**
-- Check that the column headers match exactly (Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp)
 - Open the Apps Script editor and check **Executions** to see if there are any errors
-- Note: Auto and Teleop data will appear as separate rows in your sheet
+- Check that your POST request includes a valid `teamNum` field (required)
+- Verify the data format matches what the script expects
+
+### Team sheets (Team_XXX) are not appearing
+- **First check**: Look for the "RawData" sheet - data should appear there first
+- Team sheets are created automatically when data for that team arrives
+- If RawData has data but no team sheets:
+  1. Open Apps Script editor
+  2. Select `organizeAllData` function
+  3. Click Run (▶️)
+  4. This will create/update all team sheets from existing RawData
+- Check the execution log for any errors
+
+### Data appears in RawData but not in team sheets
+- This usually means the organization step failed silently
+- Run `organizeAllData()` function manually (see Step 3.5)
+- Check the execution log for error messages
+- Verify team numbers in RawData are valid (not empty, not null)
+
+### Team sheet exists but sections are empty
+- Run `organizeAllData()` to reorganize all data
+- Or manually run `updateTeamSheet(teamNumber)` for a specific team
+- Check that RawData has rows with matching Team Number and Type
 
 ### Getting "Script URL not found" error
 - Make sure you copied the entire Web App URL
@@ -170,6 +454,18 @@ If you need to change the URL (for example, if you created a new Google Sheet or
 
 ### Need to update or change the script URL?
 - See the "How to Change or Re-enter the Google Sheets URL" section above in Step 4
+
+### How to manually trigger organization
+If team sheets aren't updating automatically:
+1. Open Apps Script editor
+2. Select `organizeAllData` from the function dropdown
+3. Click Run (▶️)
+4. Check execution log for results
+
+To organize a specific team:
+1. Open Apps Script editor
+2. In the console, type: `updateTeamSheet(254)` (replace 254 with your team number)
+3. Press Enter
 
 ## Alternative: CSV Download
 
