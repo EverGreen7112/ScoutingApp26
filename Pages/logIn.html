@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Log in to match</title>
+</head>
+<body>
+    <h1>Log In</h1>
+    <form>
+        <input id="name" type="text" placeholder="Scouter name">
+        <input id="quole" type="number" placeholder="quoles">
+        <input id ="teamNum" type="number" placeholder="#9999">
+    </form>
+     <a href="game.html" id="startLink">start match</a>
+</body>
+
+<style>
+
+</style>
+
+<script src="Func.js"></script>
+<script>
+
+    // Wait for DOM to load, then set up the link
+    document.addEventListener('DOMContentLoaded', function() {
+        const link = document.getElementById('startLink');
+        if (link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (saveLoginData()) {
+                    window.location.href = 'game.html';
+                } else {
+                    alert('Please enter both name and quole and team number');
+                }
+            });
+        }
+    });
+</script>
+
+</html>
