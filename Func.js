@@ -1,11 +1,9 @@
-// Function to save Name and Quole from logIn.html to sessionStorage
+// Function to save Quole and TeamNum from logIn.html to sessionStorage
 function saveLoginData() {
-    const name = document.getElementById("name").value;
     const quole = document.getElementById("quole").value;
     const teamNum = document.getElementById("teamNum").value;
     
-    if (name && quole && teamNum) {
-        sessionStorage.setItem("scouterName", name);
+    if (quole && teamNum) {
         sessionStorage.setItem("quole", quole);
         sessionStorage.setItem("teamNum", teamNum)
         return true;
@@ -13,22 +11,19 @@ function saveLoginData() {
     return false;
 }
 
-// Function to get Name and Quole from sessionStorage
+// Function to get Quole and TeamNum from sessionStorage
 function getLoginData() {
     return {
-        name: sessionStorage.getItem("scouterName") || "",
         quole: sessionStorage.getItem("quole") || "",
         teamNum: sessionStorage.getItem("teamNum") || ""
-
     };
 }
 
-// Function to create JSON from Name, Quole, and counter
+// Function to create JSON from Quole and counter (legacy)
 function createJSON(counter) {
     const loginData = getLoginData();
     
     const jsonData = {
-        name: loginData.name,
         quole: loginData.quole,
         teamNum: loginData.teamNum,
         counter: counter,
@@ -37,12 +32,39 @@ function createJSON(counter) {
     return JSON.stringify(jsonData, null, 2);
 }
 
-// Function to create match data object (without stringify)
+// Function to create auto data object
+function createAutoData(counter, autoClimbed) {
+    const loginData = getLoginData();
+    
+    return {
+        type: "auto",
+        quole: loginData.quole,
+        teamNum: loginData.teamNum,
+        autoCounter: counter,
+        autoClimbed: autoClimbed,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// Function to create teleop data object
+function createTeleopData(counter, climbLevel) {
+    const loginData = getLoginData();
+    
+    return {
+        type: "teleop",
+        quole: loginData.quole,
+        teamNum: loginData.teamNum,
+        teleopCounter: counter,
+        climbLevel: climbLevel,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// Legacy function for backward compatibility
 function createMatchData(counter) {
     const loginData = getLoginData();
     
     return {
-        name: loginData.name,
         quole: loginData.quole,
         teamNum: loginData.teamNum,
         counter: counter,
@@ -165,15 +187,39 @@ async function exportToGoogleSheets(matchData) {
 
 // Function to download data as CSV
 function downloadCSV(matchData) {
-    // Convert match data to CSV format
-    const headers = ['Name', 'Quole', 'Team Number', 'Counter', 'Timestamp'];
-    const row = [
-        matchData.name || '',
-        matchData.quole || '',
-        matchData.teamNum || '',
-        matchData.counter || '',
-        matchData.timestamp || ''
-    ];
+    // Convert match data to CSV format based on type
+    let headers, row;
+    
+    if (matchData.type === 'auto') {
+        headers = ['Type', 'Quole', 'Team Number', 'Auto Counter', 'Auto Climbed', 'Timestamp'];
+        row = [
+            'auto',
+            matchData.quole || '',
+            matchData.teamNum || '',
+            matchData.autoCounter || '',
+            matchData.autoClimbed ? 'True' : 'False',
+            matchData.timestamp || ''
+        ];
+    } else if (matchData.type === 'teleop') {
+        headers = ['Type', 'Quole', 'Team Number', 'Teleop Counter', 'Climb Level', 'Timestamp'];
+        row = [
+            'teleop',
+            matchData.quole || '',
+            matchData.teamNum || '',
+            matchData.teleopCounter || '',
+            matchData.climbLevel || '',
+            matchData.timestamp || ''
+        ];
+    } else {
+        // Legacy format
+        headers = ['Quole', 'Team Number', 'Counter', 'Timestamp'];
+        row = [
+            matchData.quole || '',
+            matchData.teamNum || '',
+            matchData.counter || '',
+            matchData.timestamp || ''
+        ];
+    }
     
     // Escape values that contain commas or quotes
     const escapeCSV = (value) => {

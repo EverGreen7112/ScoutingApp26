@@ -1,6 +1,6 @@
 # Google Sheets Setup Instructions
 
-This guide will help you set up Google Sheets integration for your Scouting App. The app will automatically send match data to a Google Sheet when you click "end Match".
+This guide will help you set up Google Sheets integration for your Scouting App. The app will automatically send match data (Auto and Teleop) to a Google Sheet when you click "End Auto" or "End Match".
 
 ## Step 1: Create a Google Sheet
 
@@ -8,11 +8,14 @@ This guide will help you set up Google Sheets integration for your Scouting App.
 2. Create a new spreadsheet
 3. Name it something like "Scouting Data" or whatever you prefer
 4. In the first row, add these column headers:
-   - **Name** (Column A)
+   - **Type** (Column A) - Will be "auto" or "teleop"
    - **Quole** (Column B)
    - **Team Number** (Column C)
-   - **Counter** (Column D)
-   - **Timestamp** (Column E)
+   - **Auto Counter** (Column D) - Only for auto data
+   - **Auto Climbed** (Column E) - Only for auto data (True/False)
+   - **Teleop Counter** (Column F) - Only for teleop data
+   - **Climb Level** (Column G) - Only for teleop data (No Climb, L1, L2, L3)
+   - **Timestamp** (Column H)
 
 ## Step 2: Create a Google Apps Script
 
@@ -30,14 +33,49 @@ function doPost(e) {
     // Get the active spreadsheet
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     
+    // Determine data type and format the row accordingly
+    let rowData = [];
+    
+    if (data.type === 'auto') {
+      // Auto data format: Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp
+      rowData = [
+        'auto',
+        data.quole || '',
+        data.teamNum || '',
+        data.autoCounter || '',
+        data.autoClimbed ? 'True' : 'False',
+        '', // Teleop Counter (empty for auto)
+        '', // Climb Level (empty for auto)
+        data.timestamp || ''
+      ];
+    } else if (data.type === 'teleop') {
+      // Teleop data format: Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp
+      rowData = [
+        'teleop',
+        data.quole || '',
+        data.teamNum || '',
+        '', // Auto Counter (empty for teleop)
+        '', // Auto Climbed (empty for teleop)
+        data.teleopCounter || '',
+        data.climbLevel || '',
+        data.timestamp || ''
+      ];
+    } else {
+      // Legacy format (for backward compatibility)
+      rowData = [
+        data.type || '',
+        data.quole || '',
+        data.teamNum || '',
+        data.counter || data.autoCounter || data.teleopCounter || '',
+        '',
+        '',
+        '',
+        data.timestamp || ''
+      ];
+    }
+    
     // Append the data as a new row
-    sheet.appendRow([
-      data.name || '',
-      data.quole || '',
-      data.teamNum || '',
-      data.counter || '',
-      data.timestamp || ''
-    ]);
+    sheet.appendRow(rowData);
     
     // Return success response
     return ContentService.createTextOutput(JSON.stringify({
@@ -77,7 +115,7 @@ function doPost(e) {
 
 ## Step 4: Configure Your Scouting App
 
-1. When you first click "end Match" in your scouting app, you'll be prompted to enter the Google Apps Script Web App URL
+1. When you first click "End Auto" or "End Match" in your scouting app, you'll be prompted to enter the Google Apps Script Web App URL
 2. Paste the URL you copied in Step 3
 3. Click OK
 4. The URL will be saved in your browser's localStorage, so you won't need to enter it again
@@ -95,7 +133,7 @@ If you need to change the URL (for example, if you created a new Google Sheet or
    localStorage.removeItem('googleSheetsScriptUrl')
    ```
 5. Close the Developer Tools
-6. The next time you click "end Match", you'll be prompted to enter the URL again
+6. The next time you click "End Auto" or "End Match", you'll be prompted to enter the URL again
 
 **Option 2: Using Browser Settings (Alternative Method)**
 1. Open your browser's Developer Tools (F12)
@@ -105,22 +143,25 @@ If you need to change the URL (for example, if you created a new Google Sheet or
 5. Find the entry named `googleSheetsScriptUrl`
 6. Right-click it and select **Delete** (or select it and press Delete)
 7. Close Developer Tools
-8. The next time you click "end Match", you'll be prompted to enter the URL again
+8. The next time you click "End Auto" or "End Match", you'll be prompted to enter the URL again
 
 ## Step 5: Test It Out
 
 1. Go to your scouting app
-2. Enter your name, quole, and team number
-3. Click some counters
-4. Click "end Match"
-5. Check your Google Sheet - you should see a new row with your data!
+2. Enter quole and team number, then click "Start Match"
+3. In the Auto page, click the counter button and toggle the climb button if needed
+4. Click "End Auto" - this will save auto data and move to Teleop
+5. In the Teleop page, click the counter button
+6. Click "End Match" - select a climb level (No Climb, L1, L2, or L3)
+7. Check your Google Sheet - you should see two rows: one for auto data and one for teleop data!
 
 ## Troubleshooting
 
 ### Data isn't appearing in the sheet
 - Make sure you deployed the Web App with "Who has access" set to **Anyone**
-- Check that the column headers match exactly (Name, Quole, Team Number, Counter, Timestamp)
+- Check that the column headers match exactly (Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp)
 - Open the Apps Script editor and check **Executions** to see if there are any errors
+- Note: Auto and Teleop data will appear as separate rows in your sheet
 
 ### Getting "Script URL not found" error
 - Make sure you copied the entire Web App URL

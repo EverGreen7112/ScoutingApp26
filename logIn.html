@@ -151,11 +151,10 @@
     <div class="login-container">
         <h1>Log In</h1>
         <form>
-            <input id="name" type="text" placeholder="Scouter name" autocomplete="name">
             <input id="quole" type="number" placeholder="Quoles" min="0">
             <input id="teamNum" type="number" placeholder="Team #9999" min="1">
         </form>
-        <a href="game.html" id="startLink">Start Match</a>
+        <a href="auto.html" id="startLink">Start Match</a>
         <div class="settings-section">
             <button id="changeUrlBtn" class="settings-btn">Change Google Sheets URL</button>
             <div id="urlStatus" class="url-status"></div>
@@ -208,9 +207,9 @@
             link.addEventListener('click', function(e) {
                 e.preventDefault();
                 if (saveLoginData()) {
-                    window.location.href = 'game.html';
+                    window.location.href = 'auto.html';
                 } else {
-                    alert('Please enter both name and quole and team number');
+                    alert('Please enter both quole and team number');
                 }
             });
         }
