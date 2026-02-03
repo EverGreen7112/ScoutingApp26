@@ -373,6 +373,10 @@
                     
                     if (exportResult.success) {
                         showMessage('Teleop data saved and exported to Google Sheets successfully!', 'success');
+                        // After successful export, return to the login page after a short delay so the user sees the message
+                        setTimeout(function() {
+                            window.location.href = 'logIn.html';
+                        }, 1500);
                     } else {
                         const useCSV = confirm('Google Sheets export failed or was cancelled.\n\n' + 
                                                exportResult.message + 
