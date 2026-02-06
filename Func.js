@@ -1,3 +1,21 @@
+// ============================================
+// SERVICE WORKER REGISTRATION (PWA)
+// ============================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+            .then(registration => {
+                console.log('Service Worker registered successfully:', registration);
+            })
+            .catch(error => {
+                console.error('Service Worker registration failed:', error);
+            });
+    });
+}
+
+// ============================================
+// LOGIN DATA MANAGEMENT
+// ============================================
 // Function to save Quole and TeamNum from logIn.html to sessionStorage
 function saveLoginData() {
     const quole = document.getElementById("quole").value;
