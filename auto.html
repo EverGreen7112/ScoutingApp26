@@ -45,10 +45,31 @@
             gap: 2rem;
         }
         
+        .buttons-row {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .button-label {
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
         .counter-button {
-            width: 280px;
-            height: 280px;
-            border-radius: 50%;
+            width: 220px;
+            height: 220px;
+            border-radius: 8px;
             background: white;
             border: none;
             font-size: 4rem;
@@ -59,6 +80,9 @@
             transition: transform 0.1s, box-shadow 0.2s;
             touch-action: manipulation;
             user-select: none;
+        }
+        .counter-button.delivery-button {
+            color: #006f3f; /* darker green for delivery */
         }
         
         .counter-button:active {
@@ -79,6 +103,8 @@
             font-weight: 600;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
+        
+
         
         .climb-button {
             width: 200px;
@@ -186,9 +212,13 @@
             }
             
             .counter-button {
-                width: 240px;
-                height: 240px;
-                font-size: 3.5rem;
+                width: 160px;
+                height: 160px;
+                font-size: 3rem;
+            }
+            
+            .button-label {
+                font-size: 0.875rem;
             }
             
             .climb-button {
@@ -210,9 +240,9 @@
         
         @media (max-width: 360px) {
             .counter-button {
-                width: 200px;
-                height: 200px;
-                font-size: 3rem;
+                width: 140px;
+                height: 140px;
+                font-size: 2.5rem;
             }
         }
     </style>
@@ -220,7 +250,16 @@
 <body>
     <h1 class="title">Auto</h1>
     <div class="container">
-        <button class="counter-button" id="counter" onclick="counting()">0</button>
+        <div class="buttons-row">
+            <div class="button-group">
+                <div class="button-label">Counter</div>
+                <button class="counter-button" id="counter" onclick="counting()">0</button>
+            </div>
+            <div class="button-group">
+                <div class="button-label">Delivery</div>
+                <button class="counter-button delivery-button" id="deliveryCounter" onclick="countDelivery()">0</button>
+            </div>
+        </div>
         <div class="climb-section">
             <div class="climb-label">Climb</div>
             <button class="climb-button false" id="climbBtn" onclick="toggleClimb()">False</button>
@@ -237,10 +276,16 @@
     <script>
         let autoCounter = 0;
         let autoClimbed = false;
+        let autoDelivery = 0; // new delivery count
         
         function counting() {
             autoCounter++;
             document.getElementById("counter").innerText = autoCounter;
+        }
+
+        function countDelivery() {
+            autoDelivery++;
+            document.getElementById("deliveryCounter").innerText = autoDelivery;
         }
         
         function toggleClimb() {
@@ -277,7 +322,7 @@
             showMessage('Saving auto data and exporting to Google Sheets...', 'loading');
             
             try {
-                const autoData = createAutoData(autoCounter, autoClimbed);
+                const autoData = createAutoData(autoCounter, autoClimbed, autoDelivery);
                 
                 const saved = saveMatchToLocalStorage(autoData);
                 if (!saved) {

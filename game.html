@@ -38,6 +38,7 @@
         .container {
             flex: 1;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 1rem;
@@ -118,6 +119,8 @@
             gap: 1rem;
         }
         
+
+        
         .climb-dialog-btn {
             flex: 1;
             padding: 0.875rem;
@@ -143,10 +146,31 @@
             color: white;
         }
         
+        .buttons-row {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .button-label {
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
         .counter-button {
-            width: 280px;
-            height: 280px;
-            border-radius: 50%;
+            width: 220px;
+            height: 220px;
+            border-radius: 8px;
             background: white;
             border: none;
             font-size: 4rem;
@@ -157,6 +181,9 @@
             transition: transform 0.1s, box-shadow 0.2s;
             touch-action: manipulation;
             user-select: none;
+        }
+        .counter-button.delivery-button {
+            color: #006f3f; /* darker green */
         }
         
         .counter-button:active {
@@ -243,9 +270,13 @@
             }
             
             .counter-button {
-                width: 240px;
-                height: 240px;
-                font-size: 3.5rem;
+                width: 160px;
+                height: 160px;
+                font-size: 3rem;
+            }
+            
+            .button-label {
+                font-size: 0.875rem;
             }
             
             .end-match-button {
@@ -265,9 +296,9 @@
         
         @media (max-width: 360px) {
             .counter-button {
-                width: 200px;
-                height: 200px;
-                font-size: 3rem;
+                width: 140px;
+                height: 140px;
+                font-size: 2.5rem;
             }
         }
     </style>
@@ -275,7 +306,16 @@
     <body>
         <h1 class="title">Teleop</h1>
         <div class="container">
-            <button class="counter-button" id="counter" onclick="counting()">0</button>
+            <div class="buttons-row">
+                <div class="button-group">
+                    <div class="button-label">Counter</div>
+                    <button class="counter-button" id="counter" onclick="counting()">0</button>
+                </div>
+                <div class="button-group">
+                    <div class="button-label">Delivery</div>
+                    <button class="counter-button delivery-button" id="deliveryCounter" onclick="countDelivery()">0</button>
+                </div>
+            </div>
         </div>
         <div class="actions-section">
             <button class="end-match-button" id="exit" onclick="handleEndMatch()">End Match</button>
@@ -316,10 +356,16 @@
         <script>
             let teleopCounter = 0;
             let selectedClimb = null;
+            let teleopDelivery = 0;
             
             function counting() {
                 teleopCounter++;
                 document.getElementById("counter").innerText = teleopCounter;
+            }
+
+            function countDelivery() {
+                teleopDelivery++;
+                document.getElementById("deliveryCounter").innerText = teleopDelivery;
             }
             
             function showMessage(text, type) {
@@ -367,7 +413,7 @@
                 showMessage('Saving teleop data and exporting to Google Sheets...', 'loading');
                 
                 try {
-                    const teleopData = createTeleopData(teleopCounter, selectedClimb);
+                    const teleopData = createTeleopData(teleopCounter, selectedClimb, teleopDelivery);
                     
                     const saved = saveMatchToLocalStorage(teleopData);
                     if (!saved) {
@@ -401,9 +447,12 @@
                     // Reset for next match
                     teleopCounter = 0;
                     selectedClimb = null;
+                    teleopDelivery = 0;
                     if (counterEl) {
                         counterEl.innerText = teleopCounter;
                     }
+                    const deliveryEl = document.getElementById('deliveryCounter');
+                    if (deliveryEl) deliveryEl.innerText = teleopDelivery;
                 } catch (error) {
                     console.error('Error in handleEndMatch:', error);
                     showMessage('An error occurred: ' + error.message, 'error');

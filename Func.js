@@ -38,20 +38,21 @@ function getLoginData() {
 }
 
 // Function to create JSON from Quole and counter (legacy)
-function createJSON(counter) {
+function createJSON(counter, deliveryCounter) {
     const loginData = getLoginData();
     
     const jsonData = {
         quole: loginData.quole,
         teamNum: loginData.teamNum,
         counter: counter,
+        deliveryCounter: deliveryCounter || 0,
         timestamp: new Date().toISOString()
     };
     return JSON.stringify(jsonData, null, 2);
 }
 
 // Function to create auto data object
-function createAutoData(counter, autoClimbed) {
+function createAutoData(counter, autoClimbed, deliveryCounter) {
     const loginData = getLoginData();
     
     return {
@@ -60,12 +61,13 @@ function createAutoData(counter, autoClimbed) {
         teamNum: loginData.teamNum,
         autoCounter: counter,
         autoClimbed: autoClimbed,
+        deliveryCounter: deliveryCounter || 0,
         timestamp: new Date().toISOString()
     };
 }
 
 // Function to create teleop data object
-function createTeleopData(counter, climbLevel) {
+function createTeleopData(counter, climbLevel, deliveryCounter) {
     const loginData = getLoginData();
     
     return {
@@ -74,18 +76,20 @@ function createTeleopData(counter, climbLevel) {
         teamNum: loginData.teamNum,
         teleopCounter: counter,
         climbLevel: climbLevel,
+        deliveryCounter: deliveryCounter || 0,
         timestamp: new Date().toISOString()
     };
 }
 
 // Legacy function for backward compatibility
-function createMatchData(counter) {
+function createMatchData(counter, deliveryCounter) {
     const loginData = getLoginData();
     
     return {
         quole: loginData.quole,
         teamNum: loginData.teamNum,
         counter: counter,
+        deliveryCounter: deliveryCounter || 0,
         timestamp: new Date().toISOString()
     };
 }
@@ -98,9 +102,17 @@ function getJSON() {
 
 
 let counter = 0;
+let deliveryCounter = 0; // new counter for delivery button
+
 function counting() {
     counter++;
     document.getElementById("counter").innerText = counter;
+}
+
+function countingDelivery() {
+    deliveryCounter++;
+    const el = document.getElementById("deliveryCounter");
+    if (el) el.innerText = deliveryCounter;
 }
 
 // Function to save match data to localStorage
@@ -209,23 +221,25 @@ function downloadCSV(matchData) {
     let headers, row;
     
     if (matchData.type === 'auto') {
-        headers = ['Type', 'Quole', 'Team Number', 'Auto Counter', 'Auto Climbed', 'Timestamp'];
+        headers = ['Type', 'Quole', 'Team Number', 'Auto Counter', 'Auto Climbed', 'Delivery Counter', 'Timestamp'];
         row = [
             'auto',
             matchData.quole || '',
             matchData.teamNum || '',
             matchData.autoCounter || '',
             matchData.autoClimbed ? 'True' : 'False',
+            matchData.deliveryCounter || 0,
             matchData.timestamp || ''
         ];
     } else if (matchData.type === 'teleop') {
-        headers = ['Type', 'Quole', 'Team Number', 'Teleop Counter', 'Climb Level', 'Timestamp'];
+        headers = ['Type', 'Quole', 'Team Number', 'Teleop Counter', 'Climb Level', 'Delivery Counter', 'Timestamp'];
         row = [
             'teleop',
             matchData.quole || '',
             matchData.teamNum || '',
             matchData.teleopCounter || '',
             matchData.climbLevel || '',
+            matchData.deliveryCounter || 0,
             matchData.timestamp || ''
         ];
     } else {
