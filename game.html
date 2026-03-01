@@ -356,12 +356,38 @@
             </div>
         </div>
 
+        <!-- Defense dialog: shown after climb submission -->
+        <div class="climb-dialog" id="defenseDialog">
+            <div class="climb-dialog-content">
+                <div class="climb-dialog-title">Defense</div>
+                <div class="climb-options">
+                    <div class="climb-option">
+                        <input type="radio" id="didDefending" name="defense" value="did defending">
+                        <label for="didDefending">did defending</label>
+                    </div>
+                    <div class="climb-option">
+                        <input type="radio" id="beenDefended" name="defense" value="been defended">
+                        <label for="beenDefended">been defended</label>
+                    </div>
+                    <div class="climb-option">
+                        <input type="radio" id="bothDef" name="defense" value="both">
+                        <label for="bothDef">both</label>
+                    </div>
+                </div>
+                <div class="climb-dialog-buttons">
+                    <button class="climb-dialog-btn cancel" onclick="closeDefenseDialog()">Cancel</button>
+                    <button class="climb-dialog-btn submit" onclick="submitDefense()">Submit</button>
+                </div>
+            </div>
+        </div>
+
         <script src="Func.js"></script>
         <script>
             let teleopCounter = 0;
             let selectedClimb = null;
             let teleopDelivery = 0;
             let teleopClimbTime = '';
+            let teleopDefense = '';
             
             function counting() {
                 teleopCounter++;
@@ -430,7 +456,8 @@
                         }
                     }
                     closeClimbDialog();
-                    handleEndMatch();
+                    // open defense dialog before finalizing match
+                    showDefenseDialog();
                 }
             }
             
@@ -449,7 +476,7 @@
                 showMessage('Saving teleop data and exporting to Google Sheets...', 'loading');
                 
                 try {
-                    const teleopData = createTeleopData(teleopCounter, selectedClimb, teleopDelivery, teleopClimbTime);
+                    const teleopData = createTeleopData(teleopCounter, selectedClimb, teleopDelivery, teleopClimbTime, teleopDefense);
                     
                     const saved = saveMatchToLocalStorage(teleopData);
                     if (!saved) {
@@ -485,6 +512,7 @@
                     selectedClimb = null;
                     teleopDelivery = 0;
                     teleopClimbTime = '';
+                    teleopDefense = '';
                     // clear climb dialog inputs
                     const timeInput = document.getElementById('climbTimeInput');
                     if (timeInput) timeInput.value = '';
@@ -499,6 +527,29 @@
                 } finally {
                     exitButton.disabled = false;
                     exitButton.textContent = 'End Match';
+                }
+            }
+
+            // Defense dialog functions
+            function showDefenseDialog() {
+                const dlg = document.getElementById('defenseDialog');
+                if (dlg) dlg.classList.add('show');
+            }
+
+            function closeDefenseDialog() {
+                const dlg = document.getElementById('defenseDialog');
+                if (dlg) dlg.classList.remove('show');
+            }
+
+            function submitDefense() {
+                const selected = document.querySelector('input[name="defense"]:checked');
+                if (selected) {
+                    teleopDefense = selected.value;
+                    closeDefenseDialog();
+                    // now finalize and send match data
+                    handleEndMatch();
+                } else {
+                    alert('Please choose a defense option.');
                 }
             }
         </script>

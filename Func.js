@@ -67,7 +67,7 @@ function createAutoData(counter, autoClimbed, deliveryCounter) {
 }
 
 // Function to create teleop data object
-function createTeleopData(counter, climbLevel, deliveryCounter, climbTime) {
+function createTeleopData(counter, climbLevel, deliveryCounter, climbTime, defense) {
     const loginData = getLoginData();
     
     return {
@@ -78,6 +78,7 @@ function createTeleopData(counter, climbLevel, deliveryCounter, climbTime) {
         climbLevel: climbLevel,
         deliveryCounter: deliveryCounter || 0,
         climbTime: climbTime || '',
+        defense: defense || '',
         timestamp: new Date().toISOString()
     };
 }
@@ -233,7 +234,7 @@ function downloadCSV(matchData) {
             matchData.timestamp || ''
         ];
     } else if (matchData.type === 'teleop') {
-        headers = ['Type', 'Quole', 'Team Number', 'Teleop Counter', 'Climb Level', 'Climb Time', 'Delivery Counter', 'Timestamp'];
+        headers = ['Type', 'Quole', 'Team Number', 'Teleop Counter', 'Climb Level', 'Climb Time', 'Defense', 'Delivery Counter', 'Timestamp'];
         row = [
             'teleop',
             matchData.quole || '',
@@ -241,6 +242,7 @@ function downloadCSV(matchData) {
             matchData.teleopCounter || '',
             matchData.climbLevel || '',
             matchData.climbTime || '',
+            matchData.defense || '',
             matchData.deliveryCounter || 0,
             matchData.timestamp || ''
         ];
