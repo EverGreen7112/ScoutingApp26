@@ -329,21 +329,25 @@
                 <div class="climb-dialog-title">Climb</div>
                 <div class="climb-options">
                     <div class="climb-option">
-                        <input type="radio" id="noClimb" name="climb" value="No Climb" checked>
+                        <input type="radio" id="noClimb" name="climb" value="No Climb" checked onclick="updateClimbTimeField()">
                         <label for="noClimb">No Climb</label>
                     </div>
                     <div class="climb-option">
-                        <input type="radio" id="l1" name="climb" value="L1">
+                        <input type="radio" id="l1" name="climb" value="L1" onclick="updateClimbTimeField()">
                         <label for="l1">L1</label>
                     </div>
                     <div class="climb-option">
-                        <input type="radio" id="l2" name="climb" value="L2">
+                        <input type="radio" id="l2" name="climb" value="L2" onclick="updateClimbTimeField()">
                         <label for="l2">L2</label>
                     </div>
                     <div class="climb-option">
-                        <input type="radio" id="l3" name="climb" value="L3">
+                        <input type="radio" id="l3" name="climb" value="L3" onclick="updateClimbTimeField()">
                         <label for="l3">L3</label>
                     </div>
+                </div>
+                <div class="climb-time-section" id="climbTimeSection" style="display: none; margin-bottom:1rem;">
+                    <label for="climbTimeInput" style="display:block; font-weight:600; margin-bottom:0.25rem;">Climb time (seconds)</label>
+                    <input type="number" id="climbTimeInput" min="0" step="0.1" placeholder="e.g. 5.2" style="width:100%; padding:0.5rem; font-size:1rem;" />
                 </div>
                 <div class="climb-dialog-buttons">
                     <button class="climb-dialog-btn cancel" onclick="closeClimbDialog()">Cancel</button>
@@ -357,6 +361,7 @@
             let teleopCounter = 0;
             let selectedClimb = null;
             let teleopDelivery = 0;
+            let teleopClimbTime = '';
             
             function counting() {
                 teleopCounter++;
@@ -383,6 +388,20 @@
             
             function showClimbDialog() {
                 document.getElementById('climbDialog').classList.add('show');
+                // reset climb time field when opening
+                updateClimbTimeField();
+            }
+
+            function updateClimbTimeField() {
+                const selected = document.querySelector('input[name="climb"]:checked');
+                const section = document.getElementById('climbTimeSection');
+                const input = document.getElementById('climbTimeInput');
+                if (selected && selected.value !== 'No Climb') {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                    if (input) input.value = '';
+                }
             }
             
             function closeClimbDialog() {
@@ -393,6 +412,23 @@
                 const selected = document.querySelector('input[name="climb"]:checked');
                 if (selected) {
                     selectedClimb = selected.value;
+                    teleopClimbTime = '';
+                    if (selectedClimb !== 'No Climb') {
+                        const inputEl = document.getElementById('climbTimeInput');
+                        if (inputEl) {
+                            const val = inputEl.value.trim();
+                            if (val === '') {
+                                alert('Please enter climb time or choose No Climb.');
+                                return; // stay in dialog
+                            }
+                            const num = parseFloat(val);
+                            if (isNaN(num) || num < 0) {
+                                alert('Climb time must be a non-negative number.');
+                                return;
+                            }
+                            teleopClimbTime = num;
+                        }
+                    }
                     closeClimbDialog();
                     handleEndMatch();
                 }
@@ -413,7 +449,7 @@
                 showMessage('Saving teleop data and exporting to Google Sheets...', 'loading');
                 
                 try {
-                    const teleopData = createTeleopData(teleopCounter, selectedClimb, teleopDelivery);
+                    const teleopData = createTeleopData(teleopCounter, selectedClimb, teleopDelivery, teleopClimbTime);
                     
                     const saved = saveMatchToLocalStorage(teleopData);
                     if (!saved) {
@@ -448,6 +484,10 @@
                     teleopCounter = 0;
                     selectedClimb = null;
                     teleopDelivery = 0;
+                    teleopClimbTime = '';
+                    // clear climb dialog inputs
+                    const timeInput = document.getElementById('climbTimeInput');
+                    if (timeInput) timeInput.value = '';
                     if (counterEl) {
                         counterEl.innerText = teleopCounter;
                     }
