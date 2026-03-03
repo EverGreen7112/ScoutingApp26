@@ -17,7 +17,7 @@ Your spreadsheet will automatically have **3 logical layers**:
 - **Purpose**: Receives every POST request from your app
 - **Never edit manually** - This is your single source of truth
 - **Append-only** - Data is never deleted or modified
-- **Columns**: Type, Quole, Team Number, Auto Counter, Auto Climbed, Teleop Counter, Climb Level, Timestamp
+- **Columns**: Type, Quale, Team Number, Auto Counter, Auto Delivery, Auto Climb, Teleop Counter, Teleop Delivery, Climb Level, Climb Time, Defense, Timestamp
 
 #### 2️⃣ **Team_XXX Sheets** (Created Automatically)
 - **One sheet per team** (e.g., `Team_254`, `Team_1678`)
@@ -61,35 +61,47 @@ function doPost(e) {
     if (data.type === 'auto') {
       rowData = [
         'auto',
-        data.quole || '',
+        data.quale || data.quole || '',
         data.teamNum || '',
-        data.autoCounter || '',
-        data.autoClimbed ? 'True' : 'False',
+        data.autoCounter || 0,
+        data.autoDelivery || data.deliveryCounter || 0,
+        (data.autoClimb !== undefined) ? data.autoClimb : (data.autoClimbed ? data.autoClimbed : ''),
         '', // Teleop Counter (empty for auto)
+        '', // Teleop Delivery (empty for auto)
         '', // Climb Level (empty for auto)
+        '', // Climb Time (empty for auto)
+        '', // Defense (empty for auto)
         data.timestamp || ''
       ];
     } else if (data.type === 'teleop') {
       rowData = [
         'teleop',
-        data.quole || '',
+        data.quale || data.quole || '',
         data.teamNum || '',
         '', // Auto Counter (empty for teleop)
-        '', // Auto Climbed (empty for teleop)
-        data.teleopCounter || '',
+        '', // Auto Delivery (empty for teleop)
+        '', // Auto Climb (empty for teleop)
+        data.teleopCounter || 0,
+        data.teleopDelivery || data.deliveryCounter || 0,
         data.climbLevel || '',
+        data.climbTime || '',
+        data.defense || '',
         data.timestamp || ''
       ];
     } else {
-      // Legacy format (for backward compatibility)
+      // Legacy format (for backward compatibility) - best-effort map
       rowData = [
         data.type || '',
-        data.quole || '',
+        data.quale || data.quole || '',
         data.teamNum || '',
-        data.counter || data.autoCounter || data.teleopCounter || '',
-        '',
-        '',
-        '',
+        data.autoCounter || data.counter || data.teleopCounter || 0,
+        data.autoDelivery || data.deliveryCounter || 0,
+        data.autoClimb || data.autoClimbed || '',
+        data.teleopCounter || '',
+        data.deliveryCounter || 0,
+        data.climbLevel || '',
+        data.climbTime || '',
+        data.defense || '',
         data.timestamp || ''
       ];
     }
@@ -129,12 +141,16 @@ function getOrCreateRawDataSheet() {
     // Set up headers
     const headers = [
       'Type',
-      'Quole',
+      'Quale',
       'Team Number',
       'Auto Counter',
-      'Auto Climbed',
+      'Auto Delivery',
+      'Auto Climb',
       'Teleop Counter',
+      'Teleop Delivery',
       'Climb Level',
+      'Climb Time',
+      'Defense',
       'Timestamp'
     ];
     rawDataSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -168,9 +184,9 @@ function getOrCreateTeamSheet(teamNumber) {
     teamSheet.getRange(1, 1).setValue('TEAM ' + teamNumber + ' — AUTO');
     teamSheet.getRange(1, 1).setFontWeight('bold');
     teamSheet.getRange(1, 1).setFontSize(14);
-    teamSheet.getRange(1, 1, 1, 4).merge();
+    teamSheet.getRange(1, 1, 1, 5).merge();
     
-    const autoHeaders = ['Timestamp', 'Quole', 'Auto Counter', 'Auto Climbed'];
+    const autoHeaders = ['Timestamp', 'Quale', 'Auto Counter', 'Auto Delivery', 'Auto Climb'];
     teamSheet.getRange(2, 1, 1, autoHeaders.length).setValues([autoHeaders]);
     teamSheet.getRange(2, 1, 1, autoHeaders.length).setFontWeight('bold');
     teamSheet.getRange(2, 1, 1, autoHeaders.length).setBackground('#e3f2fd');
@@ -180,9 +196,9 @@ function getOrCreateTeamSheet(teamNumber) {
     teamSheet.getRange(teleopStartRow, 1).setValue('TEAM ' + teamNumber + ' — TELEOP');
     teamSheet.getRange(teleopStartRow, 1).setFontWeight('bold');
     teamSheet.getRange(teleopStartRow, 1).setFontSize(14);
-    teamSheet.getRange(teleopStartRow, 1, 1, 4).merge();
+    teamSheet.getRange(teleopStartRow, 1, 1, 7).merge();
     
-    const teleopHeaders = ['Timestamp', 'Quole', 'Teleop Counter', 'Climb Level'];
+    const teleopHeaders = ['Timestamp', 'Quale', 'Teleop Counter', 'Teleop Delivery', 'Climb Level', 'Climb Time', 'Defense'];
     teamSheet.getRange(teleopStartRow + 1, 1, 1, teleopHeaders.length).setValues([teleopHeaders]);
     teamSheet.getRange(teleopStartRow + 1, 1, 1, teleopHeaders.length).setFontWeight('bold');
     teamSheet.getRange(teleopStartRow + 1, 1, 1, teleopHeaders.length).setBackground('#fff3e0');
@@ -209,11 +225,15 @@ function updateTeamSheet(teamNumber) {
     // Find column indices
     const typeCol = headers.indexOf('Type');
     const teamCol = headers.indexOf('Team Number');
-    const quoleCol = headers.indexOf('Quole');
+    const qualeCol = headers.indexOf('Quale');
     const autoCounterCol = headers.indexOf('Auto Counter');
-    const autoClimbedCol = headers.indexOf('Auto Climbed');
+    const autoDeliveryCol = headers.indexOf('Auto Delivery');
+    const autoClimbCol = headers.indexOf('Auto Climb');
     const teleopCounterCol = headers.indexOf('Teleop Counter');
+    const teleopDeliveryCol = headers.indexOf('Teleop Delivery');
     const climbLevelCol = headers.indexOf('Climb Level');
+    const climbTimeCol = headers.indexOf('Climb Time');
+    const defenseCol = headers.indexOf('Defense');
     const timestampCol = headers.indexOf('Timestamp');
     
     // Filter data for this team
@@ -226,30 +246,88 @@ function updateTeamSheet(teamNumber) {
         if (row[typeCol] === 'auto') {
           autoRows.push([
             row[timestampCol] || '',
-            row[quoleCol] || '',
-            row[autoCounterCol] || '',
-            row[autoClimbedCol] || ''
+            row[qualeCol] || '',
+            row[autoCounterCol] || 0,
+            row[autoDeliveryCol] || 0,
+            row[autoClimbCol] || ''
           ]);
         } else if (row[typeCol] === 'teleop') {
           teleopRows.push([
             row[timestampCol] || '',
-            row[quoleCol] || '',
-            row[teleopCounterCol] || '',
-            row[climbLevelCol] || ''
+            row[qualeCol] || '',
+            row[teleopCounterCol] || 0,
+            row[teleopDeliveryCol] || 0,
+            row[climbLevelCol] || '',
+            row[climbTimeCol] || '',
+            row[defenseCol] || ''
           ]);
         }
       }
     }
     
-    // Sort by timestamp (oldest first)
+    // Sort by timestamp (oldest first), then delivery desc, then counters/climb/defense
     autoRows.sort((a, b) => {
-      if (!a[0] || !b[0]) return 0;
-      return new Date(a[0]) - new Date(b[0]);
+      // a[0]=Timestamp, a[3]=Auto Delivery, a[2]=Auto Counter, a[4]=Auto Climb
+      const dateA = a[0] ? new Date(a[0]) : null;
+      const dateB = b[0] ? new Date(b[0]) : null;
+      if (dateA && dateB) {
+        const d = dateA - dateB;
+        if (d !== 0) return d; // oldest first
+      } else if (dateA && !dateB) {
+        return 1;
+      } else if (!dateA && dateB) {
+        return -1;
+      }
+
+      const deliveryA = Number(a[3] || 0);
+      const deliveryB = Number(b[3] || 0);
+      if (deliveryA !== deliveryB) return deliveryB - deliveryA; // delivery desc
+
+      const counterA = Number(a[2] || 0);
+      const counterB = Number(b[2] || 0);
+      if (counterA !== counterB) return counterB - counterA; // higher score first
+
+      const climbA = Number(a[4] || 0);
+      const climbB = Number(b[4] || 0);
+      if (climbA !== climbB) return climbB - climbA; // climb desc
+
+      return 0;
     });
-    
+
     teleopRows.sort((a, b) => {
-      if (!a[0] || !b[0]) return 0;
-      return new Date(a[0]) - new Date(b[0]);
+      // a[0]=Timestamp, a[3]=Teleop Delivery, a[4]=Climb Level, a[6]=Defense, a[2]=Teleop Counter, a[5]=Climb Time
+      const dateA = a[0] ? new Date(a[0]) : null;
+      const dateB = b[0] ? new Date(b[0]) : null;
+      if (dateA && dateB) {
+        const d = dateA - dateB;
+        if (d !== 0) return d; // oldest first
+      } else if (dateA && !dateB) {
+        return 1;
+      } else if (!dateA && dateB) {
+        return -1;
+      }
+
+      const deliveryA = Number(a[3] || 0);
+      const deliveryB = Number(b[3] || 0);
+      if (deliveryA !== deliveryB) return deliveryB - deliveryA; // delivery desc
+
+      const climbA = Number(a[4] || 0);
+      const climbB = Number(b[4] || 0);
+      if (climbA !== climbB) return climbB - climbA; // climb level desc
+
+      const defenseA = (a[6] || '').toString();
+      const defenseB = (b[6] || '').toString();
+      if (defenseA !== defenseB) return defenseA.localeCompare(defenseB); // defense asc
+
+      const teleopA = Number(a[2] || 0);
+      const teleopB = Number(b[2] || 0);
+      if (teleopA !== teleopB) return teleopB - teleopA; // teleop counter desc
+
+      const climbTimeA = Number(a[5] || 0);
+      const climbTimeB = Number(b[5] || 0);
+      if (climbTimeA !== climbTimeB) return climbTimeA - climbTimeB; // shorter climb time first
+
+      return 0;
     });
     
     // Clear existing data (but keep headers)
@@ -262,7 +340,22 @@ function updateTeamSheet(teamNumber) {
     
     // Insert AUTO data
     if (autoRows.length > 0) {
-      teamSheet.getRange(autoDataStartRow, 1, autoRows.length, 4).setValues(autoRows);
+      teamSheet.getRange(autoDataStartRow, 1, autoRows.length, 5).setValues(autoRows);
+      // Compute Auto average (Auto Counter average) and write it on the header row (col 7)
+      let autoSum = 0;
+      let autoCount = 0;
+      for (let i = 0; i < autoRows.length; i++) {
+        const val = Number(autoRows[i][2] || 0);
+        if (!isNaN(val)) { autoSum += val; autoCount++; }
+      }
+      const autoAvg = autoCount > 0 ? (autoSum / autoCount) : 0;
+      teamSheet.getRange(2, 7).setValue('Auto Avg');
+      teamSheet.getRange(2, 8).setValue(autoAvg);
+      // style the average cells
+      teamSheet.getRange(2, 7, 1, 2).setFontWeight('bold').setFontSize(12).setBackground('#ffeb3b');
+    } else {
+      teamSheet.getRange(2, 7).clearContent().setBackground(null);
+      teamSheet.getRange(2, 8).clearContent().setBackground(null);
     }
     
     // TELEOP section starts at row 4 (after AUTO section)
@@ -274,9 +367,9 @@ function updateTeamSheet(teamNumber) {
       teamSheet.getRange(teleopDataStartRow - 1, 1).setValue('TEAM ' + teamNumber + ' — TELEOP');
       teamSheet.getRange(teleopDataStartRow - 1, 1).setFontWeight('bold');
       teamSheet.getRange(teleopDataStartRow - 1, 1).setFontSize(14);
-      teamSheet.getRange(teleopDataStartRow - 1, 1, 1, 4).merge();
+      teamSheet.getRange(teleopDataStartRow - 1, 1, 1, 7).merge();
       
-      const teleopHeaders = ['Timestamp', 'Quole', 'Teleop Counter', 'Climb Level'];
+      const teleopHeaders = ['Timestamp', 'Quale', 'Teleop Counter', 'Teleop Delivery', 'Climb Level', 'Climb Time', 'Defense'];
       teamSheet.getRange(teleopDataStartRow, 1, 1, teleopHeaders.length).setValues([teleopHeaders]);
       teamSheet.getRange(teleopDataStartRow, 1, 1, teleopHeaders.length).setFontWeight('bold');
       teamSheet.getRange(teleopDataStartRow, 1, 1, teleopHeaders.length).setBackground('#fff3e0');
@@ -284,7 +377,22 @@ function updateTeamSheet(teamNumber) {
     
     // Insert TELEOP data
     if (teleopRows.length > 0) {
-      teamSheet.getRange(teleopDataStartRow + 1, 1, teleopRows.length, 4).setValues(teleopRows);
+      teamSheet.getRange(teleopDataStartRow + 1, 1, teleopRows.length, 7).setValues(teleopRows);
+      // Compute Teleop average (Teleop Counter average) and write it on the teleop header row (next to headers)
+      let teleopSum = 0;
+      let teleopCount = 0;
+      for (let i = 0; i < teleopRows.length; i++) {
+        const val = Number(teleopRows[i][2] || 0);
+        if (!isNaN(val)) { teleopSum += val; teleopCount++; }
+      }
+      const teleopAvg = teleopCount > 0 ? (teleopSum / teleopCount) : 0;
+      teamSheet.getRange(teleopDataStartRow, 8).setValue('Teleop Avg');
+      teamSheet.getRange(teleopDataStartRow, 9).setValue(teleopAvg);
+      // style teleop avg
+      teamSheet.getRange(teleopDataStartRow, 8, 1, 2).setFontWeight('bold').setFontSize(12).setBackground('#ffeb3b');
+    } else {
+      teamSheet.getRange(teleopDataStartRow, 8).clearContent().setBackground(null);
+      teamSheet.getRange(teleopDataStartRow, 9).clearContent().setBackground(null);
     }
     
   } catch (error) {
